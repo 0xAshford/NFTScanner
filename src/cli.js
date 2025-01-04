@@ -2,9 +2,11 @@
 
 const { Command } = require('commander');
 const NFTScanner = require('./scanner');
+const BlockchainConnection = require('./blockchain');
 const program = new Command();
 
 const scanner = new NFTScanner();
+const blockchain = new BlockchainConnection();
 
 program
   .name('nft-scan')
@@ -48,8 +50,32 @@ program
   .command('holders <address>')
   .description('Get holder distribution for NFT collection')
   .option('-c, --chain <chain>', 'blockchain to scan', 'ethereum')
-  .action((address, options) => {
+  .option('-l, --limit <limit>', 'max tokens to check', '100')
+  .action(async (address, options) => {
     console.log(`Getting holders for: ${address} on ${options.chain}`);
+    
+    try {
+      const collectionInfo = await blockchain.getCollectionInfo(address, options.chain);
+      if (collectionInfo) {
+        console.log(`Collection: ${collectionInfo.name} (${collectionInfo.symbol})`);
+        console.log(`Total Supply: ${collectionInfo.totalSupply}`);
+      }
+      
+      const holders = await blockchain.getHolders(address, options.chain, parseInt(options.limit));
+      
+      if (holders.length > 0) {
+        console.log(`\nTop 10 Holders:`);
+        holders.slice(0, 10).forEach((holder, index) => {
+          console.log(`${index + 1}. ${holder.address} - ${holder.tokenCount} tokens`);
+        });
+        
+        console.log(`\nTotal unique holders: ${holders.length}`);
+        const totalTokens = holders.reduce((sum, holder) => sum + holder.tokenCount, 0);
+        console.log(`Average tokens per holder: ${(totalTokens / holders.length).toFixed(2)}`);
+      }
+    } catch (error) {
+      console.error('Error getting holders:', error.message);
+    }
   });
 
 program.parse();
