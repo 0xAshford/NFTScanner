@@ -1,18 +1,20 @@
 const axios = require('axios');
+const config = require('./config');
 
 class NFTScanner {
   constructor(apiKey = null) {
-    this.apiKey = apiKey;
-    this.baseUrls = {
-      ethereum: 'https://api.opensea.io/api/v1',
-      polygon: 'https://api.opensea.io/api/v1'
-    };
+    this.apiKey = apiKey || config.opensea.apiKey;
+    this.baseUrl = config.opensea.baseUrl;
+    this.rateLimit = config.opensea.rateLimit;
   }
 
   async getCollectionStats(contractAddress, chain = 'ethereum') {
     try {
-      const url = `${this.baseUrls[chain]}/collection/${contractAddress}/stats`;
-      const response = await axios.get(url);
+      const url = `${this.baseUrl}/collection/${contractAddress}/stats`;
+      const headers = this.apiKey ? { 'X-API-KEY': this.apiKey } : {};
+      
+      const response = await axios.get(url, { headers });
+      await this.sleep(this.rateLimit);
       return response.data;
     } catch (error) {
       console.error('Error fetching collection stats:', error.message);
@@ -22,19 +24,25 @@ class NFTScanner {
 
   async getCollectionAssets(contractAddress, chain = 'ethereum', limit = 50) {
     try {
-      const url = `${this.baseUrls[chain]}/assets`;
+      const url = `${this.baseUrl}/assets`;
       const params = {
         asset_contract_address: contractAddress,
         limit: limit,
         order_direction: 'desc'
       };
       
-      const response = await axios.get(url, { params });
+      const headers = this.apiKey ? { 'X-API-KEY': this.apiKey } : {};
+      const response = await axios.get(url, { params, headers });
+      await this.sleep(this.rateLimit);
       return response.data.assets || [];
     } catch (error) {
       console.error('Error fetching assets:', error.message);
       return [];
     }
+  }
+
+  async sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   async analyzeRarity(assets) {

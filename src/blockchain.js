@@ -1,4 +1,5 @@
 const { ethers } = require('ethers');
+const config = require('./config');
 
 class BlockchainConnection {
   constructor() {
@@ -8,8 +9,8 @@ class BlockchainConnection {
     };
     
     this.rpcUrls = {
-      ethereum: 'https://ethereum-rpc.publicnode.com',
-      polygon: 'https://polygon-rpc.com'
+      ethereum: config.blockchain.ethereum.rpcUrl,
+      polygon: config.blockchain.polygon.rpcUrl
     };
     
     this.erc721Abi = [
