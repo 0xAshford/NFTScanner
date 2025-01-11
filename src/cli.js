@@ -3,11 +3,13 @@
 const { Command } = require('commander');
 const NFTScanner = require('./scanner');
 const BlockchainConnection = require('./blockchain');
+const MetadataFetcher = require('./metadata');
 const Utils = require('./utils');
 const program = new Command();
 
 const scanner = new NFTScanner();
 const blockchain = new BlockchainConnection();
+const metadataFetcher = new MetadataFetcher();
 
 program
   .name('nft-scan')
@@ -20,6 +22,7 @@ program
   .option('-c, --chain <chain>', 'blockchain to scan (ethereum, polygon)', 'ethereum')
   .option('-o, --output <format>', 'output format (json, csv)', 'json')
   .option('-f, --file <filename>', 'output filename')
+  .option('-m, --metadata', 'fetch metadata from IPFS')
   .action(async (address, options) => {
     if (!Utils.validateContractAddress(address)) {
       console.error('Invalid contract address format');
@@ -31,8 +34,20 @@ program
     
     try {
       const stats = await scanner.getCollectionStats(address, options.chain);
-      const assets = await scanner.getCollectionAssets(address, options.chain, 20);
+      let assets = await scanner.getCollectionAssets(address, options.chain, 20);
       console.log(`Found ${assets.length} assets`);
+      
+      if (options.metadata && assets.length > 0) {
+        console.log('Fetching metadata from IPFS...');
+        assets = await metadataFetcher.batchEnrichAssets(
+          assets.map(asset => ({ 
+            ...asset, 
+            contractAddress: address, 
+            chain: options.chain 
+          })), 
+          blockchain
+        );
+      }
       
       let exportData = [];
       
@@ -42,14 +57,20 @@ program
         
         console.log('Top 5 Rarest Assets:');
         sorted.slice(0, 5).forEach((asset, index) => {
-          console.log(`${index + 1}. Token #${asset.tokenId} - Score: ${asset.rarityScore.toFixed(2)}`);
+          const name = asset.metadata?.name || asset.name || `Token #${asset.tokenId}`;
+          console.log(`${index + 1}. ${name} - Score: ${asset.rarityScore.toFixed(2)}`);
         });
         
         exportData = sorted.map(asset => ({
           tokenId: asset.tokenId,
-          name: asset.name || `Token #${asset.tokenId}`,
+          name: asset.metadata?.name || asset.name || `Token #${asset.tokenId}`,
           rarityScore: asset.rarityScore.toFixed(2),
-          traitCount: asset.traits ? asset.traits.length : 0
+          traitCount: asset.traits ? asset.traits.length : 0,
+          ...(options.metadata && asset.metadata && {
+            description: asset.metadata.description,
+            imageUrl: asset.metadata.image,
+            owner: asset.owner
+          })
         }));
       }
       
