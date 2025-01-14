@@ -45,23 +45,51 @@ class NFTScanner {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  async getFloorPrice(contractAddress, chain = 'ethereum') {
+    try {
+      const url = `${this.baseUrl}/collection/${contractAddress}/stats`;
+      const headers = this.apiKey ? { 'X-API-KEY': this.apiKey } : {};
+      
+      const response = await axios.get(url, { headers });
+      await this.sleep(this.rateLimit);
+      
+      const stats = response.data?.stats;
+      if (stats) {
+        return {
+          floorPrice: stats.floor_price,
+          totalVolume: stats.total_volume,
+          totalSales: stats.total_sales,
+          averagePrice: stats.average_price,
+          marketCap: stats.market_cap,
+          count: stats.count
+        };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error fetching floor price:', error.message);
+      return null;
+    }
+  }
+
   async analyzeRarity(assets) {
     const traitCounts = {};
     const totalSupply = assets.length;
 
     assets.forEach(asset => {
-      if (asset.traits) {
-        asset.traits.forEach(trait => {
-          const key = `${trait.trait_type}:${trait.value}`;
-          traitCounts[key] = (traitCounts[key] || 0) + 1;
-        });
-      }
+      const traits = asset.traits || asset.metadata?.attributes || [];
+      traits.forEach(trait => {
+        const key = `${trait.trait_type}:${trait.value}`;
+        traitCounts[key] = (traitCounts[key] || 0) + 1;
+      });
     });
 
     return assets.map(asset => {
       let rarityScore = 0;
-      if (asset.traits) {
-        asset.traits.forEach(trait => {
+      const traits = asset.traits || asset.metadata?.attributes || [];
+      
+      if (traits.length > 0) {
+        traits.forEach(trait => {
           const key = `${trait.trait_type}:${trait.value}`;
           const frequency = traitCounts[key] / totalSupply;
           rarityScore += 1 / frequency;
@@ -72,7 +100,9 @@ class NFTScanner {
         tokenId: asset.token_id,
         name: asset.name,
         rarityScore: rarityScore,
-        traits: asset.traits
+        traits: traits,
+        ...(asset.metadata && { metadata: asset.metadata }),
+        ...(asset.owner && { owner: asset.owner })
       };
     });
   }

@@ -33,7 +33,13 @@ program
     console.log(`Chain: ${options.chain}`);
     
     try {
-      const stats = await scanner.getCollectionStats(address, options.chain);
+      const floorStats = await scanner.getFloorPrice(address, options.chain);
+      if (floorStats && floorStats.floorPrice) {
+        console.log(`Floor Price: ${floorStats.floorPrice} ETH`);
+        console.log(`Total Volume: ${Utils.formatNumber(floorStats.totalVolume)} ETH`);
+        console.log(`Total Sales: ${Utils.formatNumber(floorStats.totalSales)}`);
+      }
+      
       let assets = await scanner.getCollectionAssets(address, options.chain, 20);
       console.log(`Found ${assets.length} assets`);
       
@@ -143,6 +149,37 @@ program
       }
     } catch (error) {
       console.error('Error getting holders:', error.message);
+    }
+  });
+
+program
+  .command('price <address>')
+  .description('Get floor price and market stats for NFT collection')
+  .option('-c, --chain <chain>', 'blockchain to check', 'ethereum')
+  .action(async (address, options) => {
+    if (!Utils.validateContractAddress(address)) {
+      console.error('Invalid contract address format');
+      return;
+    }
+
+    console.log(`Getting price data for: ${address}`);
+    
+    try {
+      const stats = await scanner.getFloorPrice(address, options.chain);
+      
+      if (stats) {
+        console.log('\n📊 Market Statistics:');
+        console.log(`Floor Price: ${stats.floorPrice || 'N/A'} ETH`);
+        console.log(`Average Price: ${stats.averagePrice || 'N/A'} ETH`);
+        console.log(`Total Volume: ${Utils.formatNumber(stats.totalVolume || 0)} ETH`);
+        console.log(`Total Sales: ${Utils.formatNumber(stats.totalSales || 0)}`);
+        console.log(`Market Cap: ${Utils.formatNumber(stats.marketCap || 0)} ETH`);
+        console.log(`Collection Size: ${Utils.formatNumber(stats.count || 0)} items`);
+      } else {
+        console.log('No price data available for this collection');
+      }
+    } catch (error) {
+      console.error('Error fetching price data:', error.message);
     }
   });
 
