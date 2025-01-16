@@ -5,6 +5,7 @@ const NFTScanner = require('./scanner');
 const BlockchainConnection = require('./blockchain');
 const MetadataFetcher = require('./metadata');
 const Utils = require('./utils');
+const { logError, ValidationError } = require('./errors');
 const program = new Command();
 
 const scanner = new NFTScanner();
@@ -91,7 +92,8 @@ program
         }
       }
     } catch (error) {
-      console.error('Error scanning collection:', error.message);
+      logError(error, 'scanning collection');
+      process.exit(1);
     }
   });
 
@@ -148,7 +150,8 @@ program
         }
       }
     } catch (error) {
-      console.error('Error getting holders:', error.message);
+      logError(error, 'getting holders');
+      process.exit(1);
     }
   });
 
@@ -157,14 +160,13 @@ program
   .description('Get floor price and market stats for NFT collection')
   .option('-c, --chain <chain>', 'blockchain to check', 'ethereum')
   .action(async (address, options) => {
-    if (!Utils.validateContractAddress(address)) {
-      console.error('Invalid contract address format');
-      return;
-    }
-
-    console.log(`Getting price data for: ${address}`);
-    
     try {
+      if (!Utils.validateContractAddress(address)) {
+        throw new ValidationError('Invalid contract address format');
+      }
+
+      console.log(`Getting price data for: ${address}`);
+      
       const stats = await scanner.getFloorPrice(address, options.chain);
       
       if (stats) {
@@ -179,7 +181,8 @@ program
         console.log('No price data available for this collection');
       }
     } catch (error) {
-      console.error('Error fetching price data:', error.message);
+      logError(error, 'fetching price data');
+      process.exit(1);
     }
   });
 

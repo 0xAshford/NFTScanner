@@ -1,5 +1,6 @@
 const axios = require('axios');
 const config = require('./config');
+const { handleApiError, retry } = require('./errors');
 
 class NFTScanner {
   constructor(apiKey = null) {
@@ -9,16 +10,19 @@ class NFTScanner {
   }
 
   async getCollectionStats(contractAddress, chain = 'ethereum') {
-    try {
+    const fetchStats = retry(async () => {
       const url = `${this.baseUrl}/collection/${contractAddress}/stats`;
       const headers = this.apiKey ? { 'X-API-KEY': this.apiKey } : {};
       
       const response = await axios.get(url, { headers });
       await this.sleep(this.rateLimit);
       return response.data;
+    });
+
+    try {
+      return await fetchStats();
     } catch (error) {
-      console.error('Error fetching collection stats:', error.message);
-      return null;
+      handleApiError(error, `fetching stats for ${contractAddress}`);
     }
   }
 
